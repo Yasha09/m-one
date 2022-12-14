@@ -4,14 +4,15 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
 import { AuthService } from './auth.service';
 import { AuthConfirmEmailDto } from './dto/auth-confirm-email.dto';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
-import { Auth } from './decorators/user.decorator';
+import { RefreshTokenGuard } from '../common/guards/refreshToken.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -35,9 +36,10 @@ export class AuthController {
     return this.service.login(loginDTO);
   }
 
+  // user.id need to change to refresh token and check their expiration date
   @Post('refresh')
-  @UseGuards(AuthGuard('jwt'))
-  async refresh_token(@Auth() user) {
-    return this.service.refreshTokens(user.sub);
+  @UseGuards(RefreshTokenGuard)
+  async refresh_token(@Req() req: Request) {
+    return this.service.refreshTokens(req.user);
   }
 }

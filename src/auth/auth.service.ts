@@ -1,12 +1,12 @@
 import {
   BadRequestException,
-  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import { JwtService } from '@nestjs/jwt';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
 import { SendgridService } from './sendgrid.service';
@@ -15,9 +15,9 @@ import { User } from '@prisma/client';
 import { StatusEnum } from '../users/enums/user.status.enum';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
 import { compare, hashPassword } from './utils/hashPassword';
-import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class AuthService {
@@ -26,35 +26,34 @@ export class AuthService {
     private readonly prisma: PrismaService,
     public readonly sendGridService: SendgridService,
     private jwtService: JwtService,
+    private userService: UsersService,
   ) {}
 
-  async register(userRegisterDto: AuthRegisterLoginDto) {
+  async register(
+    userRegisterDto: AuthRegisterLoginDto,
+  ): Promise<{ msg: string }> {
     const { email, name, password } = userRegisterDto;
 
-    const userExists = await this.prisma.user.findUnique({
-      where: {
-        email,
-      },
-    });
+    const userExists = await this.userService.findByEmail(email);
 
     if (userExists) {
       throw new BadRequestException('Email already exists');
     }
     const passwordHashed = await hashPassword(password);
 
+    // Email authorisation code
     const hash = crypto
       .createHash('sha256')
       .update(randomStringGenerator())
       .digest('hex');
 
-    await this.prisma.user.create({
-      data: {
-        name,
-        email,
-        password: passwordHashed,
-        hash,
-      },
+    await this.userService.createUser({
+      name,
+      email,
+      password: passwordHashed,
+      hash,
     });
+
     await this.sendGridService
       .send({
         to: email,
@@ -68,9 +67,12 @@ export class AuthService {
       .catch((err) => {
         console.log('err ', err);
       });
+    return {
+      msg: 'Successfully created, please check your email',
+    };
   }
 
-  async confirmEmail(hash: string) {
+  async confirmEmail(hash: string): Promise<{ msg: string }> {
     const user = await this.prisma.user.findFirst({
       where: {
         hash,
@@ -94,16 +96,14 @@ export class AuthService {
         status: StatusEnum.Active,
       },
     });
+
+    return { msg: 'Successfuly activated account by email' };
   }
 
   async login(
     loginDto: AuthEmailLoginDto,
   ): Promise<{ tokens: Tokens; user: Omit<User, 'password'> }> {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: loginDto.email,
-      },
-    });
+    const user = await this.userService.findByEmail(loginDto.email);
     if (!user || user.status !== StatusEnum.Active) {
       throw new HttpException(
         {
@@ -116,20 +116,7 @@ export class AuthService {
       );
     }
     const isValidPassword = await compare(loginDto.password, user.password);
-    if (isValidPassword) {
-      const tokens = await this.getTokens(user.id, user.email);
-      this.prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
-          refreshToken: tokens.refresh_token,
-        },
-      });
-      delete user.password;
-
-      return { tokens, user };
-    } else {
+    if (!isValidPassword) {
       throw new HttpException(
         {
           status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -140,6 +127,14 @@ export class AuthService {
         HttpStatus.UNPROCESSABLE_ENTITY,
       );
     }
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.userService.setCurrentRefreshToken(
+      tokens.refresh_token,
+      user.id,
+    );
+    delete user.password;
+
+    return { tokens, user };
   }
 
   async getTokens(userId: number, email: string): Promise<Tokens> {
@@ -150,12 +145,14 @@ export class AuthService {
 
     const [at, rt] = await Promise.all([
       this.jwtService.signAsync(jwtPayload, {
-        secret: this.configService.get<string>('AT_SECRET'),
-        expiresIn: '15m',
+        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION_DATE'),
       }),
       this.jwtService.signAsync(jwtPayload, {
-        secret: this.configService.get<string>('RT_SECRET'),
-        expiresIn: '7d',
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get<string>(
+          'JWT_REFRESH_EXPIRATION_DATE',
+        ),
       }),
     ]);
 
@@ -166,27 +163,14 @@ export class AuthService {
   }
 
   async refreshTokens(
-    userId: number,
+    user,
   ): Promise<{ tokens: Tokens; user: Omit<User, 'password'> }> {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-    });
-    if (!user || !user.refreshToken) {
-      throw new ForbiddenException('Access Denied');
-    }
-
-    const tokens = await this.getTokens(user.id, user.email);
-    await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        refreshToken: tokens.refresh_token,
-      },
-    });
-
+    const tokens = await this.getTokens(user.sub, user.email);
+    await this.userService.setCurrentRefreshToken(
+      tokens.refresh_token,
+      user.id,
+    );
+    delete user.password;
     return { tokens, user };
   }
 }
