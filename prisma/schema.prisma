@@ -16,14 +16,37 @@ enum UserStatus {
   Deleted
 }
 
+enum FriendsStatus {
+  Pending
+  Accepted
+  Declined
+}
+
 model User {
-  id           Int         @id @default(autoincrement())
-  email        String      @unique @db.VarChar(255)
-  name         String      @db.VarChar(255)
-  password     String?     @db.VarChar(255)
-  status       UserStatus  @default(Inactive)
-  hash         String      @unique @db.VarChar(255)
-  refreshToken String?     @db.VarChar(255)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                Int        @id @default(autoincrement())
+  email             String     @unique @db.VarChar(255)
+  firstName         String     @db.VarChar(255)
+  lastName          String     @db.VarChar(255)
+  password          String?    @db.VarChar(255)
+  status            UserStatus @default(Inactive)
+  hash              String     @unique @db.VarChar(255)
+  refreshToken      String?    @db.VarChar(255)
+  age               Int
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  userFriends       Friends[]  @relation(name: "users")
+  friendUserFriends Friends[]  @relation(name: "friend_users")
+}
+
+model Friends {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  friendUserId Int
+  Users        User          @relation(name: "users", fields: [userId], references: [id])
+  FriendUsers  User          @relation(name: "friend_users", fields: [friendUserId], references: [id])
+  stetus       FriendsStatus @default(Pending)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, friendUserId])
 }

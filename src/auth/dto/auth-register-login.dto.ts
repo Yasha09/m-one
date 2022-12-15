@@ -9,6 +9,8 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
   ValidationArguments,
+  IsNumber,
+  Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -39,9 +41,14 @@ export class AuthRegisterLoginDto {
   email: string;
 
   @IsString()
-  @MinLength(4)
+  @MinLength(3)
   @MaxLength(20)
-  name: string;
+  firstName: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(20)
+  lastName: string;
 
   @IsString()
   @MinLength(4)
@@ -56,4 +63,8 @@ export class AuthRegisterLoginDto {
   @MaxLength(20)
   @Match('password')
   confirmPassword: string;
+
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  age: number;
 }

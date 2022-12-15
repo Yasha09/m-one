@@ -11,6 +11,7 @@ import { UsersService } from './users.service';
   imports: [
     PrismaModule,
     ConfigModule,
+    // There need to add credentials
     JwtModule.register({}),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     UsersModule,

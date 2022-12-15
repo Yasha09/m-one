@@ -2,15 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { User } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
+import { UserQueryDto } from './dto/userQuery.dto';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findById(id: number) {
+    console.log(typeof id);
     return this.prisma.user.findUnique({
       where: { id },
+      include: {
+        friendUserFriends: true,
+      },
     });
   }
   async findByEmail(email: string) {
@@ -47,7 +52,28 @@ export class UsersService {
       return user;
     }
   }
-  async getAll() {
-    return this.prisma.user.findMany({});
+  async getAll(query: UserQueryDto) {
+    const where: Prisma.UserWhereInput = {
+      status: UserStatus.Active,
+    };
+    const { search } = query;
+    if (search) {
+      Object.keys(search).forEach((key) => {
+        if (key !== 'age') {
+          where[key as keyof Prisma.UserWhereInput] = {
+            startsWith: search[key],
+            mode: 'insensitive',
+          };
+        } else {
+          where[key as keyof Prisma.UserWhereInput] = Number(search[key]);
+        }
+      });
+    }
+
+    return await this.prisma.user.findMany({
+      where,
+      skip: query?.pagination?.skip,
+      take: query?.pagination?.take,
+    });
   }
 }

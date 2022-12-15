@@ -32,7 +32,7 @@ export class AuthService {
   async register(
     userRegisterDto: AuthRegisterLoginDto,
   ): Promise<{ msg: string }> {
-    const { email, name, password } = userRegisterDto;
+    const { email, firstName, lastName, password, age } = userRegisterDto;
 
     const userExists = await this.userService.findByEmail(email);
 
@@ -48,10 +48,12 @@ export class AuthService {
       .digest('hex');
 
     await this.userService.createUser({
-      name,
+      firstName,
+      lastName,
       email,
       password: passwordHashed,
       hash,
+      age,
     });
 
     await this.sendGridService
