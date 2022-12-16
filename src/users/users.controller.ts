@@ -4,6 +4,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -18,11 +19,12 @@ export class UsersController {
   @Get(':id')
   @UseGuards(AccessTokenGuard)
   @HttpCode(HttpStatus.OK)
-  findOne(@Param('id') id: string) {
-    return this.usersService.findById(parseInt(id));
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usersService.findById(id);
   }
 
   @Get()
+  @UseGuards(AccessTokenGuard)
   @HttpCode(HttpStatus.OK)
   getAll(@Query() query: UserQueryDto) {
     return this.usersService.getAll(query);

@@ -43,20 +43,13 @@ export class FriendsService {
     });
   }
 
-  async responseRequest(
-    userId: number,
-    friendId: number,
-    stetus: FriendsStatus,
-  ) {
+  async responseRequest(requestId: number, answer: boolean) {
     return this.prisma.friends.update({
       where: {
-        userId_friendUserId: {
-          userId: friendId,
-          friendUserId: userId,
-        },
+        id: requestId,
       },
       data: {
-        stetus,
+        stetus: answer ? FriendsStatus.Accepted : FriendsStatus.Declined,
       },
     });
   }

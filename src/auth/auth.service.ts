@@ -18,6 +18,7 @@ import { compare, hashPassword } from './utils/hashPassword';
 import { JwtPayload } from './types/jwtPayload.type';
 import { Tokens } from './types/tokens.type';
 import { UsersService } from '../users/users.service';
+import { UserDto, UserSelect } from '../users/dto/user.dto';
 
 @Injectable()
 export class AuthService {
@@ -97,9 +98,10 @@ export class AuthService {
       data: {
         status: StatusEnum.Active,
       },
+      select: { ...UserSelect },
     });
 
-    return { msg: 'Successfuly activated account by email' };
+    return { msg: 'Successfully activated account by email' };
   }
 
   async login(

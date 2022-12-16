@@ -10,7 +10,6 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findById(id: number) {
-    console.log(typeof id);
     return this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -18,6 +17,7 @@ export class UsersService {
       },
     });
   }
+
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
@@ -29,6 +29,7 @@ export class UsersService {
       data,
     });
   }
+
   async setCurrentRefreshToken(refreshToken: string, userId: number) {
     const hash = await bcrypt.hash(refreshToken, 10);
     await this.prisma.user.update({
@@ -44,14 +45,15 @@ export class UsersService {
   async getUserIfRefreshTokenValid(refreshToken, userId) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     // variables need to change !!!!!!
-    const ifMatchesTokens = await bcrypt.compare(
+    const isMatchesTokens = await bcrypt.compare(
       refreshToken,
       user.refreshToken,
     );
-    if (ifMatchesTokens) {
+    if (isMatchesTokens) {
       return user;
     }
   }
+
   async getAll(query: UserQueryDto) {
     const where: Prisma.UserWhereInput = {
       status: UserStatus.Active,
